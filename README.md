@@ -8,4 +8,4 @@
 - How many restaurants are in each category?
 - How are the ratings distributed in each category over time? Are there categories  in which restaurants tend to have more positive/negative ratings?
 
-![demo](sorted.PNG)
+![demo](demo/sorted_scaledStrokeWidthOverall_Labeled.PNG)

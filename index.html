@@ -1,6 +1,6 @@
 <html>
     <head>
-        <title></title>
+        <title>Yelp Ratings Visualization</title>
         <meta name="author" content="Hieu Do">
         <script src="d3.js"></script>
         <script src="https://d3js.org/d3-time.v1.min.js"></script>
@@ -37,7 +37,7 @@
             return "rgb(" + r + "," + g + "," + b +")"
         }
 
-        const MARGIN = {top: 20, left: 50, bottom: 20, right: 20}
+        const MARGIN = {top: 20, left: 50, bottom: 20, right: 200}
         const WIDTH = 600
         const HEIGHT = 400
         const CHART_WIDTH = WIDTH - MARGIN.left - MARGIN.right
@@ -58,7 +58,7 @@
         // @param restaurant: dictionary object of all data of a restaurant
         // @param firstInCat: boolean flag to make sure axes are drawn once
         // @param color: rgb color for each restaurant
-        function drawChart(id, timeRange, restaurant, firstInCat, color) {
+        function drawChart(id, timeRange, countRange, restaurant, firstInCat, color) {
             // Parse quarter to draw on axis
             let timeFormat = d3.timeParse("%Y-%m-%d");
             restaurant.map(d => d["quarter"] = timeFormat(d["quarter"]))
@@ -67,7 +67,6 @@
             restaurant.sort((x, y) => d3.ascending(x.quarter, y.quarter))
 
             // Draw scales
-            // console.log(timeRange)
             xScale = d3.scaleTime()
                 .range([0, CHART_WIDTH])
                 .domain(timeRange)
@@ -76,6 +75,10 @@
             yScale = d3.scaleLinear()
                 .range([0, CHART_HEIGHT - MARGIN.top - MARGIN.bottom])
                 .domain([5, 1]) // Rating 
+
+            strokeScale = d3.scaleLinear()
+                .range([0.5, 10])
+                .domain(countRange)
 
             if (firstInCat) {
                 let yAxis = d3.axisLeft(yScale)
@@ -132,8 +135,20 @@
                     .datum(restaurant)
                     .attr("fill", "none")
                     .attr("stroke", color)
+                    .attr("stroke-width", rest => strokeScale(d3.sum(rest, d => d.count)))
                     .attr("d", line)
-                                          
+            
+            d3.select(id)
+                .append("g")
+                .attr("transform", `translate(${MARGIN.left}, ${MARGIN.top})`)     
+                .append("text")
+                    .datum(restaurant)
+                    .attr("dx", CHART_WIDTH+3) //plus 3 for padding
+                    .attr("dy", d => yScale(d[d.length-1].rating)) 
+                    .attr("text-anchor", "start")
+                    .attr("alignment-baseline", "middle")
+                    .attr("fill", color)
+                    .text(d => d[0].business_name)             
         }
 
         // Extract categories separately for easy manipulation
@@ -165,6 +180,23 @@
             return timeRange
         }
 
+        // Get count range for each category
+        // Measure how reliable the average rating is
+        function getCountRange(business) {
+            let maxCount = 0
+            for (i=0; i<business.length; i++) {
+                let q = business[i], 
+                cnt = 0
+                for (j=0; j<q.quarters.length; j++) {
+                    cnt += q.quarters[j].count
+                }
+                if (cnt > maxCount) {
+                    maxCount = cnt
+                }                
+            }
+            return [1, maxCount]
+        }        
+
         // Transform data into arrays of dict objs
         // Mainly "flatten" out the quarters array in the original data
         // Each obj has: business_id, business_name, quarter, rating, count
@@ -184,13 +216,14 @@
 
         // Main draw function to draw all restaurants across categories
         function drawAllCharts(categories, business) {
+            let countRange = getCountRange(business)
             for (c in categories) {
-                categoryData = business.filter(d => d["category"] === c)
-                firstInCat = true;
-                let timeRange = getQuarterRangeByCat(business, c)
+                let categoryData = business.filter(d => d["category"] === c), 
+                timeRange = getQuarterRangeByCat(business, c),
+                firstInCat = true                
                 for (i=0; i<categoryData.length; i++) {
-                    restaurant = processData(categoryData[i])
-                    drawChart(categories[c], timeRange, restaurant, firstInCat, CATEGORY20[i])
+                    let restaurant = processData(categoryData[i])
+                    drawChart(categories[c], timeRange, countRange, restaurant, firstInCat, CATEGORY20[i])
                     firstInCat = false;
                 }
             }
